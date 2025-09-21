@@ -1,56 +1,69 @@
 import { useState } from 'react';
 import { Recipe, RecipeFormData } from '@/types/recipe';
-import { useRecipes } from '@/hooks/useRecipes';
+import { useResep } from '@/hooks/useRecipes';
 import { RecipeList } from '@/components/RecipeList';
 import { RecipeForm } from '@/components/RecipeForm';
 import { SearchBar } from '@/components/SearchBar';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, ChefHat } from 'lucide-react';
+import { Plus, ChefHat, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Index() {
-  
   const {
-    recipes,
+    resep,
     searchTerm,
     setSearchTerm,
-    addRecipe,
-    updateRecipe,
-    deleteRecipe,
-  } = useRecipes();
+    addResep,
+    updateResep,
+    deleteResep,
+  } = useResep();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | undefined>();
 
-  const handleAddRecipe = (recipeData: RecipeFormData) => {
-    addRecipe(recipeData);
-    setIsFormOpen(false);
+  const handleAddResep = (recipeData: RecipeFormData) => {
+    addResep(recipeData);
+    closeForm();
     toast.success('Resep berhasil ditambahkan!');
   };
 
-  const handleEditRecipe = (recipe: Recipe) => {
-    setEditingRecipe(recipe);
-    setIsFormOpen(true);
-  };
-
-  const handleUpdateRecipe = (recipeData: RecipeFormData) => {
+  const handleUpdateResep = (recipeData: RecipeFormData) => {
     if (editingRecipe) {
-      updateRecipe(editingRecipe.id, recipeData);
-      setIsFormOpen(false);
-      setEditingRecipe(undefined);
+      updateResep(editingRecipe.id, recipeData);
+      closeForm();
       toast.success('Resep berhasil diperbarui!');
     }
   };
 
-  const handleDeleteRecipe = (id: string) => {
+  const handleFormSubmit = (recipeData: RecipeFormData) => {
+    if (editingRecipe) handleUpdateResep(recipeData);
+    else handleAddResep(recipeData);
+  };
+
+  const handleEditResep = (recipe: Recipe) => {
+  const fixedRecipe: Recipe = {
+    ...recipe,
+    ingredients: Array.isArray(recipe.ingredients)
+      ? recipe.ingredients
+      : (recipe.ingredients as any).split(',').map((i: string) => i.trim()),
+    instructions: Array.isArray(recipe.instructions)
+      ? recipe.instructions
+      : (recipe.instructions as any).split(',').map((i: string) => i.trim()),
+  };
+
+  setEditingRecipe(fixedRecipe);
+  setIsFormOpen(true);
+};
+
+
+  const handleDeleteResep = (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus resep ini?')) {
-      deleteRecipe(id);
+      deleteResep(id);
       toast.success('Resep berhasil dihapus!');
     }
   };
 
-  const handleFormCancel = () => {
+  const closeForm = () => {
     setIsFormOpen(false);
     setEditingRecipe(undefined);
   };
@@ -71,44 +84,58 @@ export default function Index() {
           </p>
         </div>
 
-        {/* Search and Add Button */}
+        {/* Search and Add */}
         <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mb-8">
           <SearchBar searchTerm={searchTerm} onSearchChange={setSearchTerm} />
-          
-          <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-orange-600 hover:bg-orange-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah Resep
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <RecipeForm
-                recipe={editingRecipe}
-                onSubmit={editingRecipe ? handleUpdateRecipe : handleAddRecipe}
-                onCancel={handleFormCancel}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button
+            className="bg-orange-600 hover:bg-orange-700"
+            onClick={() => setIsFormOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Tambah Resep
+          </Button>
         </div>
 
-        {/* Recipe Statistics */}
-        {recipes.length > 0 && (
+        {/* Recipe Form Modal */}
+        {isFormOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/50 overflow-auto">
+            <div className="bg-white rounded-lg w-full max-w-4xl p-6 relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4"
+                onClick={closeForm}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+              <RecipeForm
+                recipe={editingRecipe}
+                onSubmit={handleFormSubmit}
+                onCancel={closeForm}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Statistics */}
+        {resep.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm p-4 mb-8">
             <div className="flex items-center justify-center gap-8 text-sm text-gray-600">
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{recipes.length}</div>
+                <div className="text-2xl font-bold text-orange-600">{resep.length}</div>
                 <div>Total Resep</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
-                  {Math.round(recipes.reduce((acc, recipe) => acc + recipe.cookingTime, 0) / recipes.length)}
+                  {Math.round(
+                    resep.reduce((acc, recipe) => acc + recipe.cookingTime, 0) / resep.length
+                  )}
                 </div>
                 <div>Rata-rata Waktu (menit)</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">
-                  {new Set(recipes.map(recipe => recipe.category)).size}
+                  {new Set(resep.map(recipe => recipe.category)).size}
                 </div>
                 <div>Kategori</div>
               </div>
@@ -118,9 +145,9 @@ export default function Index() {
 
         {/* Recipe List */}
         <RecipeList
-          recipes={recipes}
-          onEdit={handleEditRecipe}
-          onDelete={handleDeleteRecipe}
+          resep={resep}
+          onEdit={handleEditResep}
+          onDelete={handleDeleteResep}
         />
       </div>
     </div>

@@ -1,76 +1,76 @@
-import { useState, useEffect } from 'react';
-import { Recipe, RecipeFormData } from '@/types/recipe';
+import { useState, useEffect } from "react";
+import { Recipe, RecipeFormData } from "@/types/recipe";
 
-const STORAGE_KEY = 'recipes';
+const API_URL = "http://localhost:5001/api/resep";
 
-export const useRecipes = () => {
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+export const useResep = () => {
+  const [resep, setResep] = useState<Recipe[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Load recipes from localStorage on mount
   useEffect(() => {
-    const savedRecipes = localStorage.getItem(STORAGE_KEY);
-    if (savedRecipes) {
-      try {
-        const parsedRecipes = JSON.parse(savedRecipes).map((recipe: Recipe) => ({
-          ...recipe,
-          createdAt: new Date(recipe.createdAt),
-          updatedAt: new Date(recipe.updatedAt),
-        }));
-        setRecipes(parsedRecipes);
-      } catch (error) {
-        console.error('Error loading recipes:', error);
-      }
-    }
+    fetch(API_URL)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const transformed = data.map((r: any) => ({
+            ...r,
+            ingredients: typeof r.ingredients === "string" 
+              ? r.ingredients.split(",").map((i: string) => i.trim()) 
+              : r.ingredients,
+            instructions: typeof r.instructions === "string"
+              ? r.instructions.split(",").map((i: string) => i.trim())
+              : r.instructions
+          }));
+          setResep(transformed);
+        } else setResep([]);
+      })
+      .catch(err => setResep([]));
   }, []);
 
-  // Save recipes to localStorage whenever recipes change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
-  }, [recipes]);
-
-  const addRecipe = (recipeData: RecipeFormData) => {
-    const newRecipe: Recipe = {
-      ...recipeData,
-      id: crypto.randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    setRecipes(prev => [...prev, newRecipe]);
+  const addResep = async (data: RecipeFormData) => {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...data,
+        ingredients: data.ingredients.join(", "),
+        instructions: data.instructions.join(", ")
+      }),
+    });
+    const newResep = await res.json();
+    setResep(prev => [...prev, {
+      ...newResep,
+      ingredients: data.ingredients,
+      instructions: data.instructions
+    }]);
   };
 
-  const updateRecipe = (id: string, recipeData: RecipeFormData) => {
-    setRecipes(prev =>
-      prev.map(recipe =>
-        recipe.id === id
-          ? { ...recipe, ...recipeData, updatedAt: new Date() }
-          : recipe
-      )
-    );
+  const updateResep = async (id: string, data: RecipeFormData) => {
+    await fetch(`${API_URL}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...data,
+        ingredients: data.ingredients.join(", "),
+        instructions: data.instructions.join(", ")
+      }),
+    });
+    setResep(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
   };
 
-  const deleteRecipe = (id: string) => {
-    setRecipes(prev => prev.filter(recipe => recipe.id !== id));
+  const deleteResep = async (id: string) => {
+    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+    setResep(prev => prev.filter(r => r.id !== id));
   };
 
-  const getRecipeById = (id: string) => {
-    return recipes.find(recipe => recipe.id === id);
-  };
+  const getResepById = (id: string) => resep.find(r => r.id === id);
 
-  // Filter recipes based on search term
-  const filteredRecipes = recipes.filter(recipe =>
-    recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    recipe.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    recipe.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredResep = resep.filter(
+    r =>
+      r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return {
-    recipes: filteredRecipes,
-    searchTerm,
-    setSearchTerm,
-    addRecipe,
-    updateRecipe,
-    deleteRecipe,
-    getRecipeById,
-  };
+  return { resep: filteredResep, searchTerm, setSearchTerm, addResep, updateResep, deleteResep, getResepById };
 };
